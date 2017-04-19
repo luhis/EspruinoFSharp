@@ -1,4 +1,6 @@
 {
+  "name": "EspruinoFSharp",
+  "version": "1.0.0",
   "private": true,
   "scripts": {
     "start": "node out"
