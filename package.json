@@ -1,0 +1,9 @@
+{
+  "private": true,
+  "scripts": {
+    "start": "node out"
+  },
+  "dependencies": {
+    "fable-compiler": "^0.7.50"
+  }
+}
