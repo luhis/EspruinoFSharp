@@ -35,6 +35,10 @@ open System.Collections.Generic
     let digitalWrite (pin:Pin, state:OutPutStatus) : unit = jsNative
 
     [<Erase>]
+    [<Emit("digitalPulse($0, $1, $2)")>]
+    let digitalPulse (pin:Pin, state:OutPutStatus, time:int) : unit = jsNative
+
+    [<Erase>]
     [<Emit("save()")>]
     let save () : unit = jsNative
 
