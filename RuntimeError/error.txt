@@ -1,0 +1,12 @@
+Flash map 4MB:512/512, manuf 0xe0 chip 0x4016
+>Uncaught Error: Function "4" not found!
+ at line 6 col 20
+    var res = arr[4](5);
+                   ^
+in function "onInit" called from line 12 col 8
+onInit();
+       ^
+in function called from line 17 col 32
+}((this.main = this.main || {})));
+                               ^
+=undefineds
