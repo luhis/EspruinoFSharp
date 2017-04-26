@@ -1,6 +1,6 @@
-let lines = System.IO.File.ReadAllLines @"./error.txt"
+let lines = System.IO.File.ReadAllLines @"./error.txt" |> Seq.toList
 
-let errorLines = lines |> Seq.filter (fun a -> a.Contains("line") && a.Contains("col"))
+let errorLines = lines |> List.filter (fun a -> a.Contains("line") && a.Contains("col"))
 
 type Location = {line:int; col:int}
 
@@ -13,21 +13,19 @@ let getLocation (line:string) : Option<Location> =
     | true -> Some {line= matches.Groups.[1].Value |> int; col= matches.Groups.[2].Value |> int}
     | false -> None
 
-errorLines |> Seq.choose getLocation |> Seq.iter (fun a -> printfn "line %d col %d" a.line a.col )
+let errorItems = errorLines |> List.choose getLocation 
+errorItems |> Seq.iter (fun a -> printfn "line %d col %d" a.line a.col )
 
 #r @"../FSharp.Data.dll"
 open FSharp.Data
 type Simple = JsonProvider< @"./out/bundle.js.map" >
 
-type Segment = {outPutColumn:int; fileIndex:int; inputLine:int; inputColumn:int; nameIndex:option<int>; outPutLine:int}
+type Segment = {inputLine:int; inputColumn:int; fileIndex:int; outPutLine:int; outPutColumn:int; nameIndex:option<int>}
 
 let map = Simple.Load @"./out/bundle.js.map"
-map.Version |> System.Console.WriteLine
 let groupings = map.Mappings.Split(';')
 
 // http://www.murzwin.com/base64vlq.html
-
-let Expect0088 = "AAQQ"
 
 let base64MimeToInt =
     function
@@ -38,59 +36,51 @@ let base64MimeToInt =
     | '/' -> 63uy
     | _ -> 0uy
 
-type Vlq = {isContinuation:bool; v:uint8; isNegative:bool}
-type VlqContinuation = {isContinuation:bool; v:uint8}
-
-let toInt (v:Vlq) =
-    let multiplier =
-        match v.isNegative with
-        | true -> -1
-        | false -> 1
-    (int v.v) * multiplier
-
-let toInts (v:List<Vlq>) =
-    let rec proc (carry:int) (v:List<Vlq>) : List<int> = 
-        let prevWasCont = carry <> 0
+let toInts (v:List<uint8>) =
+    let rec proc (carry:int option) (v:List<uint8>) : List<int> = 
         match v with
         | x::xs -> 
+            let isContinuation = ((x &&& 0x20uy) >>> 5) = 0x01uy
             let itemVal =
-                match prevWasCont with
-                | true -> 
-                    let negPoint =
-                        match x.isNegative with 
-                        | true -> 1uy
-                        | false -> 0uy
-                    int <| ((x.v) <<< 1) + negPoint
-                | _ -> (toInt x)
-            match x.isContinuation with
-            | false ->  (toInt x) + carry::(proc 0 xs)
-            | true -> (proc (toInt x + carry) xs)
+                match carry with
+                | Some a -> 
+                    let multiplier =
+                        match a >= 0 with
+                        | true -> 1
+                        | _ -> -1
+                    // the shift here by 4 is not good. sometimes it will be 5. this needs to be invered or something
+                    ((int <| ((x &&& 0x1Fuy)<<< 4)) * multiplier) + (a )
+                | None -> 
+                    let v = (x &&& 0x1Euy) >>> 1
+                    let isNegative = (x &&& 0x01uy)= 0x01uy
+                    let multiplier =
+                        match isNegative with
+                        | true -> -1
+                        | false -> 1
+                    (int v) * multiplier
+            match isContinuation with
+            | false ->  itemVal::(proc None xs)
+            | true -> (proc (Some itemVal) xs)
         | [] -> []
-    v |> List.rev |> proc 0
+    v |> proc None
 
-let toVlq (i:uint8) =
-    let isNegative = (i &&& 0x01uy)= 0x01uy
-    let v = (i &&& 0xFEuy) >>> 1
-    let isContinuation = (i >>> 5) = 0x01uy
-    {isContinuation=isContinuation; v=v; isNegative=isNegative}
-
-let decode (s:string) =
+let decode (s:string) : int list =
     let chars = s.ToCharArray() |> Seq.toList
-    chars |> List.map (base64MimeToInt >> toVlq >> toInt)
+    chars |> List.map (base64MimeToInt) |> toInts
 
 let toSegment line (previousItem:option<Segment>) (s:List<int>) : option<Segment> =
     let inputLineOffSet =
         match previousItem with
-        | Some a -> a.outPutLine
+        | Some a -> a.inputLine
         | None -> 0
+    //printfn "%A" s
     match s with
     | outPutCol::fileIndex::inputLine::[inputCol] -> 
         Some {outPutColumn=outPutCol; outPutLine=(line); fileIndex=fileIndex; inputColumn=inputCol; inputLine=inputLineOffSet + inputLine; nameIndex=None}
     | _ -> None
     
-
-//let segments = groupings |> Seq.mapi (fun i a -> (decode >> (toSegment i) ) a) |> Seq.choose id
-let segments : List<Segment> = groupings |> 
+let segments : List<Segment> = 
+    groupings |> 
     Seq.mapi (fun i a -> i, a) |> 
     Seq.fold (
         fun (acc:List<Segment>) (index, item) -> 
@@ -100,5 +90,12 @@ let segments : List<Segment> = groupings |>
             | _ -> acc
     ) [] |> List.rev
 
-//printfn "Result: %i" <| Seq.length segments
-Seq.iter (fun a -> printfn "[%d,%d](#%d)=>[%d,%d]" a.inputLine a.inputColumn a.fileIndex a.outPutLine a.outPutColumn) segments
+let print segment =
+    printfn "[%d,%d](#%d)=>[%d,%d]" segment.inputLine segment.inputColumn segment.fileIndex segment.outPutLine segment.outPutColumn
+
+//Seq.iter print segments
+
+let firstError = errorItems |> List.head
+let closestMapItem = segments |> List.filter (fun a -> a.outPutLine = firstError.line && a.outPutColumn <= firstError.col) |> List.head
+
+print closestMapItem
