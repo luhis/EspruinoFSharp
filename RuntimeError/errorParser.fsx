@@ -93,9 +93,17 @@ let segments : List<Segment> =
 let print segment =
     printfn "[%d,%d](#%d)=>[%d,%d]" segment.inputLine segment.inputColumn segment.fileIndex segment.outPutLine segment.outPutColumn
 
-//Seq.iter print segments
+Seq.iter print segments
 
 let firstError = errorItems |> List.head
-let closestMapItem = segments |> List.filter (fun a -> a.outPutLine = firstError.line && a.outPutColumn <= firstError.col) |> List.head
+let closestMapItem = segments |> List.filter (fun a -> a.outPutLine <= firstError.line && a.outPutColumn <= firstError.col) |> List.sortByDescending (fun a -> a.inputColumn) |> List.head
 
-print closestMapItem
+///print closestMapItem
+
+let fileName = map.Sources.[closestMapItem.fileIndex].Replace("..", ".")
+let file = System.IO.File.ReadAllLines fileName
+
+
+
+printfn "error line:\n%s" file.[closestMapItem.inputLine + 1 + 1]
+printfn "%s^" <| ((Seq.init closestMapItem.inputColumn (fun _ -> ' ')) |> Array.ofSeq |> System.String)
