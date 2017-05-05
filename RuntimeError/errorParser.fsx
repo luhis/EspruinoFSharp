@@ -7,7 +7,7 @@ type Location = {line:int; col:int}
 open System.Text.RegularExpressions
 let pattern = Regex @".*line (?<line>\d+) col (?<col>\d+).*"
 
-let getLocation (line:string) : Option<Location> =
+let getLocation line =
     let matches = pattern.Match line
     match matches.Success with
     | true -> Some {line= matches.Groups.[1].Value |> int; col= matches.Groups.[2].Value |> int}
@@ -36,8 +36,8 @@ let base64MimeToInt =
     | '/' -> 63uy
     | _ -> 0uy
 
-let toInts (v:List<uint8>) =
-    let rec proc (carry:int option) (v:List<uint8>) : List<int> = 
+let toInts v =
+    let rec proc carry v = 
         match v with
         | x::xs -> 
             let isContinuation = ((x &&& 0x20uy) >>> 5) = 0x01uy
@@ -64,11 +64,10 @@ let toInts (v:List<uint8>) =
         | [] -> []
     v |> proc None
 
-let decode (s:string) : int list =
-    let chars = s.ToCharArray() |> Seq.toList
-    chars |> List.map (base64MimeToInt) |> toInts
+let decode (s:string) =
+    s.ToCharArray() |> Seq.toList |> List.map (base64MimeToInt) |> toInts
 
-let toSegment line (previousItem:option<Segment>) (s:List<int>) : option<Segment> =
+let toSegment line previousItem s =
     let inputLineOffSet =
         match previousItem with
         | Some a -> a.inputLine
@@ -79,11 +78,11 @@ let toSegment line (previousItem:option<Segment>) (s:List<int>) : option<Segment
         Some {outPutColumn=outPutCol; outPutLine=(line); fileIndex=fileIndex; inputColumn=inputCol; inputLine=inputLineOffSet + inputLine; nameIndex=None}
     | _ -> None
     
-let segments : List<Segment> = 
+let segments = 
     groupings |> 
     Seq.mapi (fun i a -> i, a) |> 
     Seq.fold (
-        fun (acc:List<Segment>) (index, item) -> 
+        fun acc (index, item) -> 
             let newVal = (item |> decode |> toSegment index (Seq.tryHead acc) )
             match newVal with
             | Some v -> v::acc
@@ -102,8 +101,6 @@ let closestMapItem = segments |> List.filter (fun a -> a.outPutLine <= firstErro
 
 let fileName = map.Sources.[closestMapItem.fileIndex].Replace("..", ".")
 let file = System.IO.File.ReadAllLines fileName
-
-
 
 printfn "error line:\n%s" file.[closestMapItem.inputLine + 1 + 1]
 printfn "%s^" <| ((Seq.init closestMapItem.inputColumn (fun _ -> ' ')) |> Array.ofSeq |> System.String)
