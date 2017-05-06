@@ -1,19 +1,15 @@
-let lines = System.IO.File.ReadAllLines @"./error.txt" |> Seq.toList
+let lines = System.IO.File.ReadAllText @"./error.txt"
 
-let errorLines = lines |> List.filter (fun a -> a.Contains("line") && a.Contains("col"))
-
-type Location = {line:int; col:int}
+type Location = {line:int; col:int; funcName:string}
 
 open System.Text.RegularExpressions
-let pattern = Regex @".*line (?<line>\d+) col (?<col>\d+).*"
+let pattern = Regex @".*line (?<line>\d+) col (?<col>\d+)\s*.*\s*.*\sin function ""(?<funcname>[a-zA-Z]+)"""
 
-let getLocation line =
-    let matches = pattern.Match line
-    match matches.Success with
-    | true -> Some {line= matches.Groups.[1].Value |> int; col= matches.Groups.[2].Value |> int}
-    | false -> None
+let getLocation line : List<Location> =
+    let matches = pattern.Matches line
+    matches |> Seq.cast<Match> |> Seq.map (fun (a:Match) -> {line= a.Groups.[1].Value |> int; col= a.Groups.[2].Value |> int; funcName=a.Groups.[3].Value}) |> Seq.toList
 
-let errorItems = errorLines |> List.choose getLocation 
+let errorItems = lines |> getLocation
 errorItems |> Seq.iter (fun a -> printfn "line %d col %d" a.line a.col )
 
 #r @"../FSharp.Data.dll"
@@ -23,7 +19,7 @@ type Simple = JsonProvider< @"./out/bundle.js.map" >
 type Segment = {inputLine:int; inputColumn:int; fileIndex:int; outPutLine:int; outPutColumn:int; nameIndex:option<int>}
 
 let map = Simple.Load @"./out/bundle.js.map"
-let groupings = map.Mappings.Split(';')
+let groupings = map.Mappings.Split ';'
 
 // http://www.murzwin.com/base64vlq.html
 
@@ -95,12 +91,17 @@ let print segment =
 Seq.iter print segments
 
 let firstError = errorItems |> List.head
-let closestMapItem = segments |> List.filter (fun a -> a.outPutLine <= firstError.line && a.outPutColumn <= firstError.col) |> List.sortByDescending (fun a -> a.inputColumn) |> List.head
+
+let offset = System.IO.File.ReadAllLines "./out/bundle.js" |> Seq.mapi (fun i b -> (i, b)) |> Seq.filter (fun (i, a) -> a.Contains firstError.funcName) |> Seq.head |> fst
+printfn "offset value %i" offset
+
+let trueLine = firstError.line + offset
+let closestMapItem = segments |> List.filter (fun a -> a.outPutLine <= trueLine && a.outPutColumn <= firstError.col) |> List.sortByDescending (fun a -> a.inputColumn) |> List.head
 
 ///print closestMapItem
 
 let fileName = map.Sources.[closestMapItem.fileIndex].Replace("..", ".")
 let file = System.IO.File.ReadAllLines fileName
 
-printfn "error line:\n%s" file.[closestMapItem.inputLine + 1 + 1]
+printfn "error line:\n%s" file.[closestMapItem.inputLine + (trueLine - closestMapItem.outPutLine) - 1]
 printfn "%s^" <| ((Seq.init closestMapItem.inputColumn (fun _ -> ' ')) |> Array.ofSeq |> System.String)
