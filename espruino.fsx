@@ -1,23 +1,23 @@
 
 #r "./node_modules/fable-core/Fable.Core.dll"
+#r "./node_modules/fable-compiler/bin/Fable.Compiler.dll"
 open Fable.Core
+open Fable.AST
+open Fable.Plugins
 
 open System.Collections.Generic
 
     type Pin = Pin of int
     type OutPutStatus = High=1 | Low=0
 
-    [<Erase>]
     [<Emit("getSerial()")>]
     let getSerial () : string = jsNative
 
-    [<Erase>]
     [<Emit("get_system_time()")>]
     let getSystemTime () : int = jsNative
 
     type IntervalId = IntervalId of int
 
-    [<Erase>]
     [<Emit("setInterval($0, $1)")>]
     let setInterval (func:(unit->unit), (time:int)) : IntervalId = jsNative
 
@@ -25,24 +25,26 @@ open System.Collections.Generic
     [<Emit("clearInterval($0)")>]
     let clearInterval (id:IntervalId) : unit = jsNative
 
-    
-    [<Erase>]
     [<Emit("setTimeout($0, $1)")>]
     let SetTimeout (func:(unit->unit), (time:int)) : int = jsNative
 
-    [<Erase>]
     [<Emit("digitalWrite($0, $1)")>]
     let digitalWrite (pin:Pin, state:OutPutStatus) : unit = jsNative
+        // let intConst (x:int) =
+        //     Fable.NumberConst (float x, Int32) |> Fable.Value
+        // let emitExpr =
+        //     Fable.Emit("digitalWrite($0, $1)")
+        //     |> Fable.Value
+        // let (Pin p) = pin 
+        // Fable.Apply(emitExpr, [intConst <| p; intConst <| int state], Fable.ApplyMeth, Fable.Type.Unit, None)
 
-    [<Erase>]
+    //[<Erase>]
     [<Emit("digitalPulse($0, $1, $2)")>]
     let digitalPulse (pin:Pin, state:OutPutStatus, time:int) : unit = jsNative
 
-    [<Erase>]
     [<Emit("save()")>]
     let save () : unit = jsNative
 
-    [<Erase>]
     [<Emit("require($0)")>]
     let require (s:string) : obj = jsNative
 
@@ -65,15 +67,39 @@ open System.Collections.Generic
         abstract D7 : Pin
         abstract D8 : Pin
 
-    [<Erase>]
     [<Emit("NodeMCU")>]
     let NodeMCU : INodeMCU = jsNative
 
+    type ISpiPort =
+        [<Emit("$0.send($1, $2)")>]
+        member x.Send (data:byte[], nssPin:Pin) = jsNative
+
+    type ISpi =
+        [<Emit("$0.find($1)")>]
+        member x.Find (pin:Pin) : ISpiPort = jsNative
+
+    let SPI : ISpi = jsNative
+
+    type II2CPort =
+        [<Emit("$0.readFrom($1, $2")>]
+        member x.ReadFrom (address:uint8, quantity:int) = jsNative
+        [<Emit("$0.writeTo($1, $2")>]
+        member x.WriteTo (address:uint8, data:byte[]) = jsNative
+
+    type II2C =
+        [<Emit("$0.find($1)")>]
+        member x.Find (pin:Pin) : II2CPort = jsNative
+    let I2C : II2C = jsNative
+
     type IIpAddress =
-        abstract member ip : string
-        abstract member netmask : string
-        abstract member gw : string
-        abstract member mac : string
+        [<Emit("$0.ip")>]
+        abstract member Ip : string
+        [<Emit("$0.netmask")>]
+        abstract member Netmask : string
+        [<Emit("$0.gw")>]
+        abstract member Gw : string
+        [<Emit("$0.mac")>]
+        abstract member Mac : string
 
     type IWifi =
         [<Emit("$0.scan($1)")>]
@@ -95,7 +121,7 @@ open System.Collections.Generic
         [<Emit("$0.on($1, $2)")>]
         member x.On (evtName:string, f:string->unit) : unit = jsNative
         [<Emit("$0.end()")>]
-        member x.End (contnet:string) : unit = jsNative
+        member x.End () : unit = jsNative
 
         [<Emit("$0.write($1)")>]
         member c.Write (content:string) : unit = jsNative
@@ -118,7 +144,8 @@ open System.Collections.Generic
         member s.End string : unit = jsNative
 
     type IRequest =
-        abstract member url : string
+        [<Emit("$0.url")>]
+        abstract member Url : string
 
     type IHttp =
         [<Emit("$0.request({host:$1, method:$2, path:$3}, $4)")>]
@@ -133,3 +160,30 @@ open System.Collections.Generic
     type IEsp8266 =
         [<Emit("$0.ping($1, $2)")>]
         member x.Ping (host:string, f:string -> unit) : unit = jsNative
+
+    type IMqttPublishMessage =
+        [<Emit("$0.topic")>]
+        abstract member Topic : string
+        [<Emit("$0.message")>]
+        abstract member Message : string
+
+    type IMqttConnection =
+        [<Emit("$0.on($1, $2)")>]
+        member x.On (evtName:string, f:obj->unit) : unit = jsNative
+        member x.OnPublish (f:IMqttPublishMessage->unit) : unit = x.On ("publish", (fun o -> o :?> IMqttPublishMessage |> f))
+
+        [<Emit("$0.disconnect()")>]
+        member x.Disconnect () : unit = jsNative
+        [<Emit("$0.subscribe($1)")>]
+        member x.Subscribe (s:string) : unit = jsNative
+        [<Emit("$0.publish($1, $2)")>]
+        member x.Publish (topic:string, message:string) : unit = jsNative
+
+        [<Emit("$0.connect()")>]
+        member x.Connect () : unit = jsNative
+
+    type IMqtt =
+        [<Emit("$0.create($1)")>]
+        member x.Create (ip:string) : IMqttConnection = jsNative
+
+    let Mqtt : IMqtt = require "mqtt" :?> IMqtt
