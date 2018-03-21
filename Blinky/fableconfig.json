@@ -1,6 +1,8 @@
 {
     "projFile": "./main.fsx",
-    "sourceMaps": false,
+    "sourceMaps": true,
+    "module": "es2015",
+    "ecma": "es2015",
     ////"module": "amd",
     "rollup": {
         "dest": "./out/bundle.js"
