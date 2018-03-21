@@ -106,7 +106,7 @@ open System.Collections.Generic
         member x.Scan (f: (string -> unit)) :unit  = jsNative
 
         [<Emit("$0.connect($1, {password: $2}, $3)")>]
-        member x.Connect ((accessPointName:string), (password:string), (onSuccess: string -> unit)) = jsNative
+        member x.Connect ((accessPointName:string), (password:string), (onSuccess: string -> unit)) : unit = jsNative
 
         [<Emit("$0.getIP()")>]
         member x.GetIP () : IIpAddress = jsNative
