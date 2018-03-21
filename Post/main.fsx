@@ -28,7 +28,7 @@ let onInit () : unit =
             let write (header:string) (s:string) =
                 Console.WriteLine header |> ignore
                 Console.WriteLine s |> ignore
-            Console.WriteLine ("IP: " + wifi.GetIP().ip)
+            Console.WriteLine ("IP: " + wifi.GetIP().Ip)
             Espruino.setInterval ((fun () -> (flash Espruino.NodeMCU.D2)), 500) |> ignore
             let http = (Espruino.require "http" :?> Espruino.IHttp)
             // let onGot (res:Espruino.IHttpCRq) =
@@ -45,7 +45,7 @@ let onInit () : unit =
             let post:Espruino.IHttpCRq = http.Request ("https://httpbin.org", "POST", "/post", onPosted)
             post.On("error", write "error: ")
             post.Write "my content"
-            post.End "test"
+            post.End ()
         | _ -> Console.WriteLine ("Error: " + err)
     wifi.Connect (WifiSettings.ssid, WifiSettings.password, onConnected)
 
