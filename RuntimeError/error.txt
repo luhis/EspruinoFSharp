@@ -1,5 +1,5 @@
 >Uncaught Error: Function "4" not found!
- at line 7 col 21
+ at line 6 col 21
     var fail = arr[4](99);
                     ^
 in function "onInit" called from line 14 col 8

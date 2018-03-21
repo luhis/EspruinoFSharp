@@ -10,7 +10,7 @@ let getLocation line : List<Location> =
     matches |> Seq.cast<Match> |> Seq.map (fun (a:Match) -> {line= a.Groups.[1].Value |> int; col= a.Groups.[2].Value |> int; funcName=a.Groups.[3].Value}) |> Seq.toList
 
 let errorItems = lines |> getLocation
-errorItems |> Seq.iter (fun a -> printfn "line %d col %d" a.line a.col )
+errorItems |> Seq.iter (fun a -> printfn "line %d col %d func %s" a.line a.col a.funcName )
 
 #r @"../FSharp.Data.dll"
 open FSharp.Data
@@ -92,16 +92,13 @@ Seq.iter print segments
 
 let firstError = errorItems |> List.head
 
-let offset = System.IO.File.ReadAllLines "./out/bundle.js" |> Seq.mapi (fun i b -> (i, b)) |> Seq.filter (fun (i, a) -> a.Contains firstError.funcName) |> Seq.head |> fst
-printfn "offset value %i" offset
+let funcStart = System.IO.File.ReadAllLines "./out/bundle.js" |> Seq.mapi (fun i b -> (i, b)) |> Seq.filter (fun (i, a) -> a.Contains firstError.funcName) |> Seq.head |> fst
 
-let trueLine = firstError.line + offset
+let trueLine = firstError.line + funcStart
 let closestMapItem = segments |> List.filter (fun a -> a.outPutLine <= trueLine && a.outPutColumn <= firstError.col) |> List.sortByDescending (fun a -> a.inputColumn) |> List.head
-
-///print closestMapItem
 
 let fileName = map.Sources.[closestMapItem.fileIndex].Replace("..", ".")
 let file = System.IO.File.ReadAllLines fileName
 
 printfn "error line:\n%s" file.[closestMapItem.inputLine + (trueLine - closestMapItem.outPutLine) - 1]
-printfn "%s^" <| ((Seq.init closestMapItem.inputColumn (fun _ -> ' ')) |> Array.ofSeq |> System.String)
+printfn "%s^" <| ((Seq.init (closestMapItem.inputColumn + closestMapItem.outPutColumn + 2) (fun _ -> ' ')) |> Array.ofSeq |> System.String)
