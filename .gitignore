@@ -2,3 +2,6 @@
 *.js.map
 node_modules/
 wifiSettings.*
+.vs/*
+.vscode/*
+*.dll
