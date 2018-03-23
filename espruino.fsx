@@ -159,7 +159,7 @@ open System.Collections.Generic
 
     type IEsp8266 =
         [<Emit("$0.ping($1, $2)")>]
-        member x.Ping (host:string, f:string -> unit) : unit = jsNative
+        member x.Ping (host:string, callBack:string -> unit) : unit = jsNative
 
     type IMqttPublishMessage =
         [<Emit("$0.topic")>]
@@ -167,10 +167,13 @@ open System.Collections.Generic
         [<Emit("$0.message")>]
         abstract member Message : string
 
+    [<StringEnum>]
+    type IEvent = Connected | Publish | Error | Subscribed
+
     type IMqttConnection =
         [<Emit("$0.on($1, $2)")>]
-        member x.On (evtName:string, f:obj->unit) : unit = jsNative
-        member x.OnPublish (f:IMqttPublishMessage->unit) : unit = x.On ("publish", (fun o -> o :?> IMqttPublishMessage |> f))
+        member x.On (evtName:IEvent, f:obj->unit) : unit = jsNative
+        member x.OnPublish (f:IMqttPublishMessage->unit) : unit = x.On (Publish, (fun o -> o :?> IMqttPublishMessage |> f))
 
         [<Emit("$0.disconnect()")>]
         member x.Disconnect () : unit = jsNative
