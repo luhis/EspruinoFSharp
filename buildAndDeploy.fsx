@@ -8,11 +8,11 @@ build.WaitForExit ()
 
 match build.ExitCode with
 | 0 -> 
+    System.Console.WriteLine "Build Success"
     let firstPort = System.IO.Ports.SerialPort.GetPortNames() |> Seq.tryHead
     match firstPort with
     | Some port -> 
         let baud = 115200
-        System.Console.WriteLine "Build Success"
         let script = System.IO.File.ReadAllText "./out/bundle.js"
         use port = new System.IO.Ports.SerialPort (port, baud, System.IO.Ports.Parity.None, 8, System.IO.Ports.StopBits.One)
         port.DtrEnable <- true
@@ -28,6 +28,8 @@ match build.ExitCode with
         System.Console.WriteLine "Hit ctrl C to quit"
         while true do
             System.Threading.Thread.Sleep 500
-            System.Console.Write ( port.ReadExisting ())
+            match port.ReadExisting () with
+            | "" -> ()
+            | s -> System.Console.WriteLine s
     | None -> System.Console.WriteLine "No serial port found"
 | _ -> System.Console.WriteLine "Build Fail"
